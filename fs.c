@@ -151,12 +151,11 @@ void fs_debug()
 /* examine the disk for a filesystem, build a free block bitmap, prepare the filesystem for use */
 int fs_mount()
 {
-a   // check if already mounted
+    // check if already mounted
     if (disk.mounted) {
 	return 0;
     }
 
-    disk.mounted = true; // set mounted to tree
     return 0;
 }
 
