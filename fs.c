@@ -71,7 +71,19 @@ int fs_format()
     block.super.nblocks = disk_size();
 	
     // 10% of these to inodes
-    block.super.ninodeblocks = (int) disk_size()*0.1;
+    int nblocks = block.super.nblocks;
+    double ninodes = (double)nblocks * 0.1;
+    
+    // round up ninodes (from exactly 10%)
+    if ((int) ninodes < ninodes)
+    {
+	block.super.ninodeblocks = (int)ninodes + 1;
+    }
+    else
+    {
+	block.super.ninodeblocks = (int)ninodes;
+    }
+
     block.super.ninodes = block.super.ninodeblocks * INODES_PER_BLOCK;
 
     // write superblock
@@ -151,10 +163,27 @@ void fs_debug()
 /* examine the disk for a filesystem, build a free block bitmap, prepare the filesystem for use */
 int fs_mount()
 {
+    union fs_block block;
+    
     // check if already mounted
-    if (disk.mounted) {
+    if (disk.mounted) 
+    {
+	printf("File system already mounted\n");
 	return 0;
     }
+
+    disk_read(0, block.data); // read superblock
+
+    // check for correct magic number
+    if (block.super.magic != FS_MAGIC)
+    {
+	printf("Invalid Magic Number\n");
+	return 0;
+    }
+
+    int nblocks = block.super.nblocks;
+    // create free block bitmap
+
 
     return 0;
 }
