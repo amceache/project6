@@ -127,13 +127,15 @@ void fs_debug()
     printf("    %d inodes total\n",block.super.ninodes);
 
     int i; // increments through all blocks
+    int inodes = block.super.ninodeblocks+1;
 
     // look through inode blocks
-    for (i=1; i < block.super.ninodeblocks+1; i++)
+    for (i=1; i < inodes; i++)
     {
 	disk_read(i, block.data);
 	for (int j = 0; j < INODES_PER_BLOCK; j++)
 	{
+	    
 	    if(block.inodes[j].isvalid)
 	    {
 		printf("inode %d:\n", j+(INODES_PER_BLOCK)*(i-1));
@@ -142,22 +144,26 @@ void fs_debug()
 		
 		for (int k=0; k < POINTERS_PER_INODE; k++)
 		{
-		    printf(" %d", block.inodes[j].direct[k]);
+		    if (block.inodes[j].direct[k] != 0)
+		    {
+			printf(" %d", block.inodes[j].direct[k]);
+		    }
 		}
 		printf("\n");
 
+		union fs_block indirect;
 		if (block.inodes[j].indirect > 0)
 		{
 		    printf("	indirect block: %d\n", block.inodes[j].indirect);
 
 		    // read indirect block data
-		    printf("	indirect data blocks:\n");
-		    disk_read(block.inodes[j].indirect, block.data);
+		    printf("	indirect data blocks:");
+		    disk_read(block.inodes[j].indirect, indirect.data);
 		    for (int m=0; m < POINTERS_PER_BLOCK; m++)
 		    {
-			if (block.pointers[m] > 0)
+			if (indirect.pointers[m] > 0)
 			{
-			    printf(" %d", block.pointers[m]);
+			    printf(" %d", indirect.pointers[m]);
 			}
 		    }
 		    printf("\n");
