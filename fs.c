@@ -339,6 +339,9 @@ int fs_create()
 	    disk_write(block.inodes[node].direct[i], inode.data);
 	}
 	block.inodes[node].direct[i] = 0;
+    
+    
+	// TODO: Indirection
     }
     disk_write(blck, block.data);
 
@@ -350,7 +353,39 @@ int fs_create()
 /* delete the inode indicated by the number */
 int fs_delete( int inumber )
 {
-    return 0;
+    union fs_block block;
+    disk_read(0, block.data);
+    if (inumber > block.super.ninodes)
+    {
+	return 0;
+    }
+
+    int nblock = 1;
+    while (inumber > INODES_PER_BLOCK)
+    {
+	nblock++;
+    }
+
+    disk_read(nblock, block.data);
+    if(!block.inodes[inumber].isvalid)
+    {
+	return 0;
+    }
+
+    block.inodes[inumber].isvalid = 0;
+    for (int k=0; k < POINTERS_PER_INODE; k++)
+    {
+	if(block.inodes[inumber].direct[k] > 0)
+	{
+	    int direct = block.inodes[inumber].direct[k];
+	    bitmap[direct] = 0;
+	}
+    }
+
+    // TODO: Indirection
+    disk_write(nblock, block.data);
+
+    return 1;
 }
 
 /* return the logical size of of the given inode (bytes) */
