@@ -287,8 +287,64 @@ int fs_create()
     union fs_block block;
     disk_read(0, block.data);
     int inodes = block.super.ninodeblocks;
+    int node = 0;
+    int blck = 0;
+    
+    for (int i=1; i < inodes+1; i++)
+    {
+	blck = i;
+	disk_read(i, block.data);
+	for (int j=0; j < INODES_PER_BLOCK; j++)
+	{
+	    if (!block.inodes[j].isvalid)
+	    {
+		node = j+(INODES_PER_BLOCK)*(i-1);
+		if(node == 0 && i == 1)
+		{
+		    continue;
+		}
+		break;
+	    }
+	}
+	
+	if (node != 0)
+	{
+	    break;
+	}
+    }
 
-    return 0;
+
+    if (node == 0)
+    {
+	// all nodes occupied
+	return 0;
+    }
+
+    // initilize inode
+    block.inodes[node].isvalid = 1;
+    block.inodes[node].size = 0;
+    
+    union fs_block inode;
+
+
+    for (int i=0; i < POINTERS_PER_INODE; i++)
+    {
+	if (block.inodes[node].direct[i] > 0)
+	{
+	    disk_read(block.inodes[node].direct[i], inode.data);
+	    for (int j=0; j < DISK_BLOCK_SIZE; j++)
+	    {
+		inode.data[j] = 0;
+	    }
+	    disk_write(block.inodes[node].direct[i], inode.data);
+	}
+	block.inodes[node].direct[i] = 0;
+    }
+    disk_write(blck, block.data);
+
+    printf("node: %d\n", node);
+
+    return node;
 }
 
 /* delete the inode indicated by the number */
@@ -314,7 +370,11 @@ int fs_getsize( int inumber )
     }
 
     disk_read(nblock, block.data);
-    
+    if(!block.inodes[inumber].isvalid)
+    {
+	return -1;
+    }
+
     return block.inodes[inumber].size;
 }
 
