@@ -281,9 +281,13 @@ int fs_mount()
     return 1;
 }
 
-/* create a new inode of zero length */
+/* create a new inode of zero length, returns number of inode */
 int fs_create()
 {
+    union fs_block block;
+    disk_read(0, block.data);
+    int inodes = block.super.ninodeblocks;
+
     return 0;
 }
 
@@ -296,7 +300,22 @@ int fs_delete( int inumber )
 /* return the logical size of of the given inode (bytes) */
 int fs_getsize( int inumber )
 {
-    return -1;
+    union fs_block block;
+    disk_read(0, block.data);
+    if (inumber > block.super.ninodes)
+    {
+	return -1;
+    }
+
+    int nblock = 1;
+    while (inumber > INODES_PER_BLOCK)
+    {
+	nblock++;
+    }
+
+    disk_read(nblock, block.data);
+    
+    return block.inodes[inumber].size;
 }
 
 /* read data from a valid inode */
