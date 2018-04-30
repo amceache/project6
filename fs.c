@@ -54,6 +54,7 @@ union fs_block
 /* GLOBALS ------------------------------------------------------------------ */
 
 static struct Disk disk;
+int *bitmap;
 
 /* FUNCTIONS ---------------------------------------------------------------- */
 
@@ -236,8 +237,47 @@ int fs_mount()
 
     int nblocks = block.super.nblocks;
     // create free block bitmap
+    bitmap = malloc(nblocks*sizeof(int));
+    int inodes = block.super.ninodeblocks+1;
+    for(int i=0; i < inodes; i++)
+    {
+	bitmap[i] = 1; // superblock and inode blocks filled
+    }
 
+    for(int i=1; i < inodes; i++)
+    {
+	disk_read(i, block.data);
+	for (int j=0; j < INODES_PER_BLOCK; j++)
+	{
+	    if (block.inodes[j].isvalid)
+	    {
+		for (int k=0; k < POINTERS_PER_INODE; k++)
+		{
+		    if (block.inodes[j].direct[k] > 0)
+		    {
+			bitmap[block.inodes[j].direct[k]] = 1;
+		    }
+		}
 
+		// indirection
+		union fs_block indirect;
+		if (block.inodes[j].indirect > 0)
+		{
+		    bitmap[block.inodes[j].indirect] = 1;
+		    disk_read(block.inodes[j].indirect, indirect.data);
+		    for (int m=0; m < POINTERS_PER_BLOCK; m++)
+		    {
+			if (indirect.pointers[m] > 0)
+			{
+			    bitmap[indirect.pointers[m]] = 1;
+			}
+		    }
+		}
+	    }
+	}
+    }
+
+    disk.mounted = 1; 
     return 1;
 }
 
