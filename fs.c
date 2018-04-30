@@ -46,7 +46,7 @@ struct fs_inode
 union fs_block 
 {
     struct fs_superblock super;
-    struct fs_inode inode[INODES_PER_BLOCK];
+    struct fs_inode inodes[INODES_PER_BLOCK];
     int pointers[POINTERS_PER_BLOCK];
     char data[DISK_BLOCK_SIZE];
 };
@@ -88,7 +88,19 @@ int fs_format()
 
     // write superblock
     disk_write(0, block.data);
+    int inodes = block.super.ninodeblocks+1;
 
+    for(int i=1; i < inodes; i++)
+    {	// access all inode blocks
+	disk_read(i, block.data);
+	for(int j=0; j < INODES_PER_BLOCK; j++)
+	{ // access all inodes
+	    // block.inodes[j] <-- access inode j in block i
+	}
+    }
+
+
+    /*
     // clear inode table
     for (int i=0; i<DISK_BLOCK_SIZE; i++) 
     {
@@ -99,6 +111,7 @@ int fs_format()
     {
 	disk_write(i, block.data);
     }
+    */
 
     return 1;
 }
@@ -126,35 +139,42 @@ void fs_debug()
     printf("    %d blocks for inodes\n",block.super.ninodeblocks);
     printf("    %d inodes total\n",block.super.ninodes);
 
+    int i; // increments through all blocks
+
     // look through inode blocks
-    for (int i=0; i<INODES_PER_BLOCK; i++) 
+    for (i=1; i < block.super.ninodeblocks+1; i++)
     {
-	struct fs_inode inode = block.inode[i];
-	if (inode.isvalid) 
+	disk_read(i, block.data);
+	for (int j = 0; j < INODES_PER_BLOCK; j++)
 	{
-	    printf("inode %d:\n", i);
-	    printf("    size: %d\n", inode.size);
-	    printf("    direct blocks:");
-	    for (int j=0; j<POINTERS_PER_INODE; j++) 
+	    if(block.inodes[j].isvalid)
 	    {
-		printf(" %d", inode.direct[j]);
-	    }
-	    printf("\n");
-	    if (inode.indirect > 0) 
-	    {
-		printf("    indirect block: %d\n",inode.indirect);
-		// read indirect block data
-		printf("    indirect data blocks:");
-		union fs_block ind_block;
-		disk_read(inode.indirect,ind_block.data);
-		for (int k=0; k<POINTERS_PER_BLOCK; k++) 
+		printf("inode %d:\n", j+(INODES_PER_BLOCK)*(i-1));
+		printf("    size: %d\n", block.inodes[j].size);
+		printf("    direct blocks:");
+		
+		for (int k=0; k < POINTERS_PER_INODE; k++)
 		{
-		    if (ind_block.pointers[k] > 0) 
-		    {
-			printf(" %d", ind_block.pointers[k]);
-		    }
+		    printf(" %d", block.inodes[j].direct[k]);
 		}
 		printf("\n");
+
+		if (block.inodes[j].indirect > 0)
+		{
+		    printf("	indirect block: %d\n", block.inodes[j].indirect);
+
+		    // read indirect block data
+		    printf("	indirect data blocks:\n");
+		    disk_read(block.inodes[j].indirect, block.data);
+		    for (int m=0; m < POINTERS_PER_BLOCK; m++)
+		    {
+			if (block.pointers[m] > 0)
+			{
+			    printf(" %d", block.pointers[m]);
+			}
+		    }
+		    printf("\n");
+		}
 	    }
 	}
     }
