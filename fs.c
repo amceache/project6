@@ -96,6 +96,46 @@ int fs_format()
 	for(int j=0; j < INODES_PER_BLOCK; j++)
 	{ // access all inodes
 	    block.inodes[j].isvalid = 0; // <-- access inode j in block i
+	    for (int k = 0; k < POINTERS_PER_INODE; k++)
+	    {
+		int direct = block.inodes[j].direct[k];
+		if (direct != 0)
+		{
+		    block.inodes[j].direct[k] = 0;
+		    union fs_block data_block;
+		    disk_read(direct, data_block.data);
+		    for (int m=0; m < DISK_BLOCK_SIZE; m++)
+		    {
+			data_block.data[m] = 0; // set all data to 0 in data block
+		    }
+		    disk_write(direct, data_block.data);
+		}
+		// set all direct pointers to 0
+	    }
+
+	    // indirect pointers
+	    union fs_block indirect;
+	    if (block.inodes[j].indirect > 0)
+	    {
+		disk_read(block.inodes[j].indirect, indirect.data);
+		for (int m=0; m < POINTERS_PER_BLOCK; m++)
+		{
+		    if (indirect.pointers[m] > 0)
+		    {
+			union fs_block pointer;
+			disk_read(indirect.pointers[m], pointer.data);
+			for (int n=0; n < DISK_BLOCK_SIZE; n++)
+			{
+			    pointer.data[n] = 0;
+			}
+			disk_write(indirect.pointers[m], pointer.data);
+			indirect.pointers[m] = 0;
+		    }
+		}
+		disk_write(block.inodes[j].indirect, indirect.data);
+		block.inodes[j].indirect = 0;
+		
+	    }
 	}
 	disk_write(i, block.data);
     }
