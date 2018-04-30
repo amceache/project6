@@ -95,23 +95,10 @@ int fs_format()
 	disk_read(i, block.data);
 	for(int j=0; j < INODES_PER_BLOCK; j++)
 	{ // access all inodes
-	    // block.inodes[j] <-- access inode j in block i
+	    block.inodes[j].isvalid = 0; // <-- access inode j in block i
 	}
-    }
-
-
-    /*
-    // clear inode table
-    for (int i=0; i<DISK_BLOCK_SIZE; i++) 
-    {
-	block.data[i] = 0;
-    }
-
-    for (int i=1; i<disk_size(); i++) 
-    {
 	disk_write(i, block.data);
     }
-    */
 
     return 1;
 }
@@ -205,7 +192,7 @@ int fs_mount()
     // create free block bitmap
 
 
-    return 0;
+    return 1;
 }
 
 /* create a new inode of zero length */
