@@ -426,7 +426,7 @@ int fs_read( int inumber, char *data, int length, int offset )
 	return 0;
     }
 
-    int totalinodes = (block.super.ninodeblocks*INODES_PER_BLOCK);
+    //int totalinodes = (block.super.ninodeblocks*INODES_PER_BLOCK);
 
     int i, j;
     int current_byte = 0;
@@ -529,8 +529,58 @@ int fs_read( int inumber, char *data, int length, int offset )
     return current_byte;
 }
 
-/* write data to a valie inode */
+/* write data to a valid inode */
 int fs_write( int inumber, const char *data, int length, int offset )
 {
+    printf("writing\n");
+    union fs_block block;
+    struct fs_inode inode;
+    int i, j;
+    int current_byte = 0;
+
+    // scan for free block in bitmap 
+    int *bm = bitmap;
+    int bm_loc = 0;
+    while (*bm != 0) {
+	bm++;
+	bm_loc++;
+    }
+
+    disk_read(0, block.data);
+
+    if(inumber > block.super.ninodes || inumber < 0){
+        //returns an error for the invalid inode number
+	return 0;
+    }
+
+    disk_read((int) (inumber/INODES_PER_BLOCK) + 1, block.data);
+
+
+
+    inode = block.inodes[inumber%INODES_PER_BLOCK];
+
+    if (inode.isvalid == 0) {
+        printf("valid\n");
+	return 0;
+    }
+
+    inode.direct[0] = bm_loc;
+
+    int startBlock = (int)(offset/DISK_BLOCK_SIZE);
+    printf("startbl %d\n", startBlock);
+    int current_offset = offset%4096;
+    for (i = startBlock; i < POINTERS_PER_INODE; i++) {
+	if (inode.direct[i]) {
+	    printf("inode direct i exists\n");
+	    for (j = 0; j+current_offset < DISK_BLOCK_SIZE; j++) {
+		block.data[current_byte] = data[j+current_offset];
+		current_byte++;
+		disk_write(inode.direct[i], block.data);
+		if (current_byte == length) {
+		    return current_byte;
+		}
+	    }
+	}
+    }
     return 0;
 }
