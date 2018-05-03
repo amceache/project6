@@ -324,24 +324,17 @@ int fs_create()
     block.inodes[node].isvalid = 1;
     block.inodes[node].size = 0;
     
-    union fs_block inode;
-
-
     for (int i=0; i < POINTERS_PER_INODE; i++)
     {
 	if (block.inodes[node].direct[i] > 0)
 	{
-	    disk_read(block.inodes[node].direct[i], inode.data);
-	    for (int j=0; j < DISK_BLOCK_SIZE; j++)
-	    {
-		inode.data[j] = 0;
-	    }
-	    disk_write(block.inodes[node].direct[i], inode.data);
+	    block.inodes[node].direct[i] = 0;
 	}
-	block.inodes[node].direct[i] = 0;
     
-    
-	// TODO: Indirection
+	// Indirection
+	if (block.inodes[node].indirect > 0) {
+	    block.inodes[node].indirect = 0;
+	}
     }
     disk_write(blck, block.data);
 
@@ -380,9 +373,24 @@ int fs_delete( int inumber )
 	    int direct = block.inodes[inumber].direct[k];
 	    bitmap[direct] = 0;
 	}
+    
+	if(block.inodes[inumber].indirect > 0)
+	{
+	    union fs_block indirect;
+	    disk_read(block.inodes[inumber].indirect, indirect.data);
+	    for (int j=0; j < POINTERS_PER_BLOCK; j++)
+	    {
+		int ptr = indirect.pointers[j];
+		if (ptr > 0) 
+		{
+		    bitmap[ptr] = 0;
+		}
+		indirect.pointers[j] = 0;
+	    }
+	    disk_write(block.inodes[inumber].indirect, indirect.data);
+	}
     }
-
-    // TODO: Indirection
+    
     disk_write(nblock, block.data);
 
     return 1;
