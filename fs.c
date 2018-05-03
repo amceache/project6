@@ -416,7 +416,117 @@ int fs_getsize( int inumber )
 /* read data from a valid inode */
 int fs_read( int inumber, char *data, int length, int offset )
 {
-    return 0;
+    union fs_block block;
+    struct fs_inode inode;
+
+    disk_read(0, block.data);
+
+    if(inumber > block.super.ninodes || inumber < 0){
+        //returns an error for the invalid inode number
+	return 0;
+    }
+
+    int totalinodes = (block.super.ninodeblocks*INODES_PER_BLOCK);
+
+    int i, j;
+    int current_byte = 0;
+    int first = 0;
+
+    disk_read((int) (inumber/INODES_PER_BLOCK) + 1, block.data);
+
+    inode = block.inodes[inumber%INODES_PER_BLOCK];
+
+    if (inode.isvalid == 0) {
+        //return error if the value is 0 -- needs to be valid
+	 return 0;
+    }
+    if(offset >= inode.size){
+        return 0;
+    }
+
+    int startBlock = (int)(offset/DISK_BLOCK_SIZE);
+    //Find offset per block -- by moding for 4096 -- find block
+    int current_offset = offset%4096;
+    for(i = startBlock; i < POINTERS_PER_INODE; i++){
+        if(inode.direct[i]){
+            if (first == 0) {
+                disk_read(inode.direct[i], block.data);
+                for(j = 0; j+current_offset < DISK_BLOCK_SIZE; j++){
+                    if(block.data[j+current_offset]){
+                        data[current_byte] = block.data[j+current_offset];
+                        current_byte++;
+                        if(current_byte+offset >= inode.size){
+                            return current_byte;
+                        }
+                    }
+                    else{
+                        return current_byte;
+                    }
+                        //At the end
+                        if (current_byte == length){
+                        return current_byte;
+                    }
+                }
+                first = 1;
+            }
+        //Without the offset
+            else {
+                disk_read(inode.direct[i], block.data);
+                for(j = 0; j < DISK_BLOCK_SIZE; j++){
+                    if(block.data[j]){
+                        data[current_byte] = block.data[j];
+                        current_byte++;
+                        if(current_byte+offset >= inode.size){
+                            return current_byte;
+                        }
+
+                    }
+                    else{
+                        return current_byte;
+                    }
+                    if (current_byte == length){
+                        return current_byte;
+                    }
+                }
+            }
+        }
+    }
+
+    //Indirect nodes get the data
+    //create an indirect block
+    
+    union fs_block indirectBlock;
+    printf("%d\n", startBlock);
+    int startIndirect = startBlock - 5;
+    if(inode.indirect)
+    {
+        disk_read(inode.indirect, indirectBlock.data);
+        for(i = startIndirect; i < POINTERS_PER_BLOCK; i++)
+        {
+            if (indirectBlock.pointers[i])
+            {
+                disk_read(indirectBlock.pointers[i], block.data);
+                //do same thingfor read
+                for(j = 0; j < DISK_BLOCK_SIZE; j++){
+                    if(block.data[j]){
+                        data[current_byte] = block.data[j];
+                        current_byte++;
+                        if(current_byte+offset >= inode.size){
+                            return current_byte;
+                        }
+
+                    }
+                    else{
+                        return current_byte;
+                    }
+                    if (current_byte == length){
+                        return current_byte;
+                    }
+                }
+            }
+        }
+    }
+    return current_byte;
 }
 
 /* write data to a valie inode */
