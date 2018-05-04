@@ -654,9 +654,12 @@ int fs_write( int inumber, const char *data, int length, int offset )
 	    
 	    printf("read\n");
 	    for (j = 0; j+current_offset < DISK_BLOCK_SIZE; j++) {
-		direct.data[current_byte] =  data[j+current_offset];
+		if (current_byte <= length) {
+		    direct.data[current_byte-(4096*i)] =  data[j+current_offset+(4096&i)];
+		}
 		current_byte++;
 		if (current_byte > length) {
+		    direct.data[current_byte-(4096*i)] = 0;
 		    current_byte--; // Finish off block with trailing 0s
 		}
 	    }
