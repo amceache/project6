@@ -647,7 +647,7 @@ int fs_write( int inumber, const char *data, int length, int offset )
 	    block.inodes[inode].direct[i] = bm_loc;
 	    bitmap[bm_loc] = 1;
 	    printf("new block needed to add  = %d\n", bm_loc);
-	    
+	    disk_write(num, block.data); 
 	    
 	    printf("inode direct %d exists at %d\n", block.inodes[inode].direct[i], i);
 	    disk_read(bm_loc, direct.data);	    
@@ -660,8 +660,9 @@ int fs_write( int inumber, const char *data, int length, int offset )
 		    current_byte--; // Finish off block with trailing 0s
 		}
 	    }
-	    printf("%d\n", block.inodes[inode].direct[i]);
+	    // printf("%d\n", block.inodes[inode].direct[i]);
 	    disk_write(bm_loc, direct.data);
+	    disk_read(num, block.data);
 	    printf("written\n");
 	}
     }
