@@ -542,53 +542,80 @@ int fs_write( int inumber, const char *data, int length, int offset )
 {
     printf("writing\n");
     union fs_block block;
-    struct fs_inode inode;
     int i, j;
     int current_byte = 0;
 
-    // scan for free block in bitmap 
-    int *bm = bitmap;
-    int bm_loc = 0;
-    while (*bm != 0) {
-	bm++;
-	bm_loc++;
+    if (!disk.mounted)
+    {
+	printf("disk not mounted\n");
+	return 0;
     }
+    
+    // scan for free blocks in bitmap
+    int bm_loc = 0;
 
     disk_read(0, block.data);
+
+    for (i=0; i < block.super.nblocks; i++)
+    {
+	if (bitmap[i] == 0)
+	{
+	    bm_loc = i;
+	    break;
+	}
+    }
 
     if(inumber > block.super.ninodes || inumber < 0){
         //returns an error for the invalid inode number
 	return 0;
     }
 
-    disk_read((int) (inumber/INODES_PER_BLOCK) + 1, block.data);
+    int inode = (int)(inumber/INODES_PER_BLOCK)+1;
+    disk_read(inode, block.data);
 
 
-
-    inode = block.inodes[inumber%INODES_PER_BLOCK];
-
-    if (inode.isvalid == 0) {
+    if (block.inodes[inode].isvalid == 0) {
         printf("valid\n");
 	return 0;
     }
-
-    inode.direct[0] = bm_loc;
-
+    
+    // start at starting block
     int startBlock = (int)(offset/DISK_BLOCK_SIZE);
+    if (block.inodes[inode].direct[startBlock] == 0)
+    {
+	block.inodes[inode].direct[startBlock] = bm_loc;
+	bitmap[bm_loc] = 1;
+    }
+
+    union fs_block direct;
+
+    printf("offset = %d\n", offset); 
+    
     printf("startbl %d\n", startBlock);
     int current_offset = offset%4096;
+    printf("current offset = %d\n", current_offset);
     for (i = startBlock; i < POINTERS_PER_INODE; i++) {
-	if (inode.direct[i]) {
-	    printf("inode direct i exists\n");
+	if (block.inodes[inode].direct[i] > 0) {
+	    printf("inode direct %d exists at %d\n", block.inodes[inode].direct[i], i);
+	    disk_read(block.inodes[inode].direct[i], direct.data);	    
 	    for (j = 0; j+current_offset < DISK_BLOCK_SIZE; j++) {
-		block.data[current_byte] = data[j+current_offset];
+		direct.data[current_byte] =  data[j+current_offset];
 		current_byte++;
-		disk_write(inode.direct[i], block.data);
-		if (current_byte == length) {
-		    return current_byte;
+		if (current_byte > length) {
+		    current_byte--; // Finish off block with trailing 0s
 		}
 	    }
+	    printf("%d\n", block.inodes[inode].direct[i]);
+	    disk_write(block.inodes[inode].direct[i], direct.data);
+	}
+	else
+	{
+	    if (current_byte == length)
+		break;
+	    printf("new block needed to add");
 	}
     }
-    return 0;
+    block.inodes[inode].size = current_byte;
+    disk_write(inode, block.data);
+    return current_byte;
 }
