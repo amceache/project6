@@ -326,15 +326,10 @@ int fs_create()
     
     for (int i=0; i < POINTERS_PER_INODE; i++)
     {
-	if (block.inodes[node].direct[i] > 0)
-	{
-	    block.inodes[node].direct[i] = 0;
-	}
+	block.inodes[node].direct[i] = 0;
     
 	// Indirection
-	if (block.inodes[node].indirect > 0) {
-	    block.inodes[node].indirect = 0;
-	}
+	block.inodes[node].indirect = 0;
     }
     disk_write(blck, block.data);
 
@@ -571,8 +566,10 @@ int fs_write( int inumber, const char *data, int length, int offset )
 	return 0;
     }
 
-    int inode = (int)(inumber/INODES_PER_BLOCK)+1;
-    disk_read(inode, block.data);
+    int inode = (int)(inumber%INODES_PER_BLOCK);
+    printf("inode = %d\n", inode);
+    int num = (int)(inode/INODES_PER_BLOCK) + 1;
+    disk_read(num, block.data);
 
 
     if (block.inodes[inode].isvalid == 0) {
@@ -582,6 +579,9 @@ int fs_write( int inumber, const char *data, int length, int offset )
     
     // start at starting block
     int startBlock = (int)(offset/DISK_BLOCK_SIZE);
+
+
+    printf("%d\n", block.inodes[inode].direct[startBlock]);
     if (block.inodes[inode].direct[startBlock] == 0)
     {
 	block.inodes[inode].direct[startBlock] = bm_loc;
@@ -638,6 +638,6 @@ int fs_write( int inumber, const char *data, int length, int offset )
 	}
     }
     block.inodes[inode].size = current_byte;
-    disk_write(inode, block.data);
+    disk_write(num, block.data);
     return current_byte;
 }
