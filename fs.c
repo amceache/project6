@@ -548,9 +548,9 @@ int fs_write( int inumber, const char *data, int length, int offset )
     
     // scan for free blocks in bitmap
     int bm_loc = 0;
-    int blocks = block.super.nblocks;
 
     disk_read(0, block.data);
+    int blocks = block.super.nblocks;
 
     for (i=0; i < block.super.nblocks; i++)
     {
@@ -585,6 +585,7 @@ int fs_write( int inumber, const char *data, int length, int offset )
     if (block.inodes[inode].direct[startBlock] == 0)
     {
 	block.inodes[inode].direct[startBlock] = bm_loc;
+	printf("bitmap updated\n");
 	bitmap[bm_loc] = 1;
     }
 
@@ -609,32 +610,59 @@ int fs_write( int inumber, const char *data, int length, int offset )
 	    printf("%d\n", block.inodes[inode].direct[i]);
 	    disk_write(block.inodes[inode].direct[i], direct.data);
 	}
-	else
+	else if (i < POINTERS_PER_INODE)
 	{
-	    if (current_byte == length)
+	    printf("look for block\n");
+	    if (current_byte == length) {
+		printf("End reached\n");
 		break;
+	    }
 	    
 	    // Get new block
 	    
-	    int found_bl = 1;
+	    int found_bl = 0;
+	    printf("blocks = %d\n", blocks);
+	    for (int k=0; k < blocks; k++)
+	    {
+		printf("bitmap[%d] = %d\n", k, bitmap[k]);
+	    }
+
 	    for (int k=0; k < blocks; k++) 
 	    {
 		if (bitmap[k] == 0)
 		{
-		    found_bl = 0;
+		    found_bl = 1;
 		    bm_loc = k;
+		    break;
 		}
 	    }
 	    
 	    if (!found_bl)
 	    {
 		// No free blocks found
+		printf("no blocks found\n");
 		break;
 	    }
 
-	    block.inodes[inode].direct[startBlock] = bm_loc;
+	    block.inodes[inode].direct[i] = bm_loc;
 	    bitmap[bm_loc] = 1;
-	    printf("new block needed to add");
+	    printf("new block needed to add  = %d\n", bm_loc);
+	    
+	    
+	    printf("inode direct %d exists at %d\n", block.inodes[inode].direct[i], i);
+	    disk_read(bm_loc, direct.data);	    
+	    
+	    printf("read\n");
+	    for (j = 0; j+current_offset < DISK_BLOCK_SIZE; j++) {
+		direct.data[current_byte] =  data[j+current_offset];
+		current_byte++;
+		if (current_byte > length) {
+		    current_byte--; // Finish off block with trailing 0s
+		}
+	    }
+	    printf("%d\n", block.inodes[inode].direct[i]);
+	    disk_write(bm_loc, direct.data);
+	    printf("written\n");
 	}
     }
     block.inodes[inode].size = current_byte;
