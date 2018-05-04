@@ -419,6 +419,10 @@ int fs_getsize( int inumber )
 /* read data from a valid inode */
 int fs_read( int inumber, char *data, int length, int offset )
 {
+    if (!disk.mounted) {
+	return 0;
+    }
+
     union fs_block block;
     struct fs_inode inode;
 
@@ -499,7 +503,6 @@ int fs_read( int inumber, char *data, int length, int offset )
     //create an indirect block
     
     union fs_block indirectBlock;
-    printf("%d\n", startBlock);
     int startIndirect = startBlock - 5;
     if(inode.indirect)
     {
@@ -535,14 +538,13 @@ int fs_read( int inumber, char *data, int length, int offset )
 /* write data to a valid inode */
 int fs_write( int inumber, const char *data, int length, int offset )
 {
-    printf("writing\n");
     union fs_block block;
     int i, j;
     int current_byte = 0;
 
     if (!disk.mounted)
     {
-	printf("disk not mounted\n");
+//	printf("disk not mounted\n");
 	return 0;
     }
     
@@ -567,13 +569,11 @@ int fs_write( int inumber, const char *data, int length, int offset )
     }
 
     int inode = (int)(inumber%INODES_PER_BLOCK);
-    printf("inode = %d\n", inode);
     int num = (int)(inode/INODES_PER_BLOCK) + 1;
     disk_read(num, block.data);
 
 
     if (block.inodes[inode].isvalid == 0) {
-        printf("valid\n");
 	return 0;
     }
     
@@ -581,24 +581,17 @@ int fs_write( int inumber, const char *data, int length, int offset )
     int startBlock = (int)(offset/DISK_BLOCK_SIZE);
 
 
-    printf("%d\n", block.inodes[inode].direct[startBlock]);
     if (block.inodes[inode].direct[startBlock] == 0)
     {
 	block.inodes[inode].direct[startBlock] = bm_loc;
-	printf("bitmap updated\n");
 	bitmap[bm_loc] = 1;
     }
 
     union fs_block direct;
 
-    printf("offset = %d\n", offset); 
-    
-    printf("startbl %d\n", startBlock);
     int current_offset = offset%4096;
-    printf("current offset = %d\n", current_offset);
     for (i = startBlock; i < POINTERS_PER_INODE; i++) {
 	if (block.inodes[inode].direct[i] > 0) {
-	    printf("inode direct %d exists at %d\n", block.inodes[inode].direct[i], i);
 	    disk_read(block.inodes[inode].direct[i], direct.data);	    
 	    for (j = 0; j+current_offset < DISK_BLOCK_SIZE; j++) {
 		direct.data[current_byte] =  data[j+current_offset];
@@ -607,25 +600,17 @@ int fs_write( int inumber, const char *data, int length, int offset )
 		    current_byte--; // Finish off block with trailing 0s
 		}
 	    }
-	    printf("%d\n", block.inodes[inode].direct[i]);
 	    disk_write(block.inodes[inode].direct[i], direct.data);
 	}
 	else if (i < POINTERS_PER_INODE)
 	{
-	    printf("look for block\n");
 	    if (current_byte == length) {
-		printf("End reached\n");
 		break;
 	    }
 	    
 	    // Get new block
 	    
 	    int found_bl = 0;
-	    printf("blocks = %d\n", blocks);
-	    for (int k=0; k < blocks; k++)
-	    {
-		printf("bitmap[%d] = %d\n", k, bitmap[k]);
-	    }
 
 	    for (int k=0; k < blocks; k++) 
 	    {
@@ -640,19 +625,15 @@ int fs_write( int inumber, const char *data, int length, int offset )
 	    if (!found_bl)
 	    {
 		// No free blocks found
-		printf("no blocks found\n");
 		break;
 	    }
 
 	    block.inodes[inode].direct[i] = bm_loc;
 	    bitmap[bm_loc] = 1;
-	    printf("new block needed to add  = %d\n", bm_loc);
 	    disk_write(num, block.data); 
 	    
-	    printf("inode direct %d exists at %d\n", block.inodes[inode].direct[i], i);
 	    disk_read(bm_loc, direct.data);	    
 	    
-	    printf("read\n");
 	    for (j = 0; j+current_offset < DISK_BLOCK_SIZE; j++) {
 		direct.data[current_byte] =  data[j+current_offset];
 		current_byte++;
@@ -660,10 +641,8 @@ int fs_write( int inumber, const char *data, int length, int offset )
 		    current_byte--; // Finish off block with trailing 0s
 		}
 	    }
-	    // printf("%d\n", block.inodes[inode].direct[i]);
 	    disk_write(bm_loc, direct.data);
 	    disk_read(num, block.data);
-	    printf("written\n");
 	}
     }
     block.inodes[inode].size = current_byte;
