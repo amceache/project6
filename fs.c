@@ -553,6 +553,7 @@ int fs_write( int inumber, const char *data, int length, int offset )
     
     // scan for free blocks in bitmap
     int bm_loc = 0;
+    int blocks = block.super.nblocks;
 
     disk_read(0, block.data);
 
@@ -612,6 +613,27 @@ int fs_write( int inumber, const char *data, int length, int offset )
 	{
 	    if (current_byte == length)
 		break;
+	    
+	    // Get new block
+	    
+	    int found_bl = 1;
+	    for (int k=0; k < blocks; k++) 
+	    {
+		if (bitmap[k] == 0)
+		{
+		    found_bl = 0;
+		    bm_loc = k;
+		}
+	    }
+	    
+	    if (!found_bl)
+	    {
+		// No free blocks found
+		break;
+	    }
+
+	    block.inodes[inode].direct[startBlock] = bm_loc;
+	    bitmap[bm_loc] = 1;
 	    printf("new block needed to add");
 	}
     }
